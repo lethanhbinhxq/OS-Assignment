@@ -50,6 +50,7 @@ struct vm_area_struct *get_vma_by_num(struct mm_struct *mm, int vmaid)
 	  return NULL;
 
     pvma = pvma->vm_next;
+    vmait++;
   }
 
   return pvma;
@@ -104,7 +105,12 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   /* TODO INCREASE THE LIMIT
    * inc_vma_limit(caller, vmaid, inc_sz)
    */
-  inc_vma_limit(caller, vmaid, inc_sz);
+  // inc_vma_limit(caller, vmaid, inc_sz);
+  int inc_limit_ret = inc_vma_limit(caller, vmaid, inc_sz);
+  if (inc_limit_ret != 0) {
+  /* Failed to increase the limit, so return the error */
+    return inc_limit_ret;
+  }
 
   /*Successful increase limit */
   caller->mm->symrgtbl[rgid].rg_start = old_sbrk;
@@ -130,6 +136,18 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
     return -1;
 
   /* TODO: Manage the collect freed region to freerg_list */
+  struct vm_area_struct *vma = get_vma_by_num(caller->mm, vmaid);
+
+  /* Find the region in the symbol table */
+  struct vm_rg_struct *symrg = &(vma->vm_mm->symrgtbl[rgid]);
+
+  /* Update the region node */
+  rgnode.rg_start = symrg->rg_start;
+  rgnode.rg_end = symrg->rg_end;
+  rgnode.rg_next = symrg->rg_next;
+
+  /*free the memory*/
+  free(symrg);
 
   /*enlist the obsoleted memory region */
   enlist_vm_freerg_list(caller->mm, rgnode);
@@ -147,7 +165,13 @@ int pgalloc(struct pcb_t *proc, uint32_t size, uint32_t reg_index)
   int addr;
 
   /* By default using vmaid = 0 */
-  return __alloc(proc, 0, reg_index, size, &addr);
+    int ret = __alloc(proc, 0, reg_index, size, &addr);
+
+    if (ret != 0) {
+        return -1; /* Allocation failed */
+    }
+
+    return addr;
 }
 
 /*pgfree - PAGING-based free a region memory
@@ -199,8 +223,15 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* Update its online status of the target page */
     //pte_set_fpn() & mm->pgd[pgn];
-    pte_set_fpn(&pte, tgtfpn);
-
+    uint32_t vicpte = mm->pgd[vicpgn];
+    int vicfpn = PAGING_FPN(vicpte);
+    __swap_cp_page(caller->mram, vicfpn, caller->active_mswp, swpfpn);
+    __swap_cp_page(caller->active_mswp, tgtfpn, caller->mram, vicfpn);
+    int PAGING_SWAP_TYPE = GETVAL(pte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
+    //int PAGING_SWAP_TYPE = (pte & PAGING_PTE_SWPTYP_MASK) >> PAGING_PTE_SWPTYP_LOBIT;
+    pte_set_swap(&pte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
+    pte_set_fpn(&vicpte, tgtfpn);
+    MEMPHY_put_freefp(caller->active_mswp, tgtfpn);
     enlist_pgn_node(&caller->mm->fifo_pgn,pgn);
   }
 
@@ -402,6 +433,22 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
   //struct vm_area_struct *vma = caller->mm->mmap;
 
   /* TODO validate the planned memory area is not overlapped */
+  struct vm_area_struct *vma = caller->mm->mmap;
+  // Check if the VM area is within the address space
+  if (vmastart < 0) {
+    return -EINVAL; // Invalid argument error
+  }
+  // Check if the VM area is within a valid range
+  if (vmastart >= vmaend) {
+    return -EINVAL; // Invalid argument error
+  }
+  // Check for overlaps with existing VM areas
+  while (vma != NULL) {
+    if (vma->vm_id != vmaid && vma->vm_end > vmastart && vma->vm_start < vmaend) {
+      return -EINVAL; // Invalid argument error
+    }
+    vma = vma->vm_next;
+  }
 
   return 0;
 }
@@ -432,7 +479,7 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   if (vm_map_ram(caller, area->rg_start, area->rg_end, 
                     old_end, incnumpage , newrg) < 0)
     return -1; /* Map the memory to MEMRAM */
-
+  enlist_vm_freerg_list(&caller->mm, *newrg);
   return 0;
 
 }
@@ -447,7 +494,12 @@ int find_victim_page(struct mm_struct *mm, int *retpgn)
   struct pgn_t *pg = mm->fifo_pgn;
 
   /* TODO: Implement the theorical mechanism to find the victim page */
-
+  /* Store the page number of the victim page */
+  *retpgn = pg->pgn;
+  /* update the fifo_pgn */
+  mm->fifo_pgn = mm->fifo_pgn->pg_next;
+  /* Add the victim page to the end of the FIFO queue */
+  // enlist_pgn_node(&mm->fifo_pgn, pg->pgn);
   free(pg);
 
   return 0;

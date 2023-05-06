@@ -25,14 +25,14 @@ int init_pte(uint32_t *pte,
         return -1; // Invalid setting
 
       /* Valid setting with FPN */
-      SETBIT(*pte, PAGING_PTE_PRESENT_MASK);
-      CLRBIT(*pte, PAGING_PTE_SWAPPED_MASK);
+      SETBIT(*pte, PAGING_PTE_PRESENT_MASK);    // data present
+      CLRBIT(*pte, PAGING_PTE_SWAPPED_MASK);    // Not a swap
       CLRBIT(*pte, PAGING_PTE_DIRTY_MASK);
 
       SETVAL(*pte, fpn, PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT); 
     } else { // page swapped
-      SETBIT(*pte, PAGING_PTE_PRESENT_MASK);
-      SETBIT(*pte, PAGING_PTE_SWAPPED_MASK);
+      SETBIT(*pte, PAGING_PTE_PRESENT_MASK);    // data present
+      SETBIT(*pte, PAGING_PTE_SWAPPED_MASK);    // A swap
       CLRBIT(*pte, PAGING_PTE_DIRTY_MASK);
 
       SETVAL(*pte, swptyp, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT); 
@@ -86,23 +86,40 @@ int vmap_page_range(struct pcb_t *caller, // process call
               struct vm_rg_struct *ret_rg)// return mapped region, the real mapped fp
 {                                         // no guarantee all given pages are mapped
   //uint32_t * pte = malloc(sizeof(uint32_t));
-  struct framephy_struct *fpit = malloc(sizeof(struct framephy_struct));
+  //struct framephy_struct *fpit = malloc(sizeof(struct framephy_struct)); // Like "head" -> first element in og linked list
   //int  fpn;
   int pgit = 0;
   int pgn = PAGING_PGN(addr);
 
   ret_rg->rg_end = ret_rg->rg_start = addr; // at least the very first space is usable
 
-  fpit->fp_next = frames;
+  struct framephy_struct *fpit = frames;
 
+  while (pgit < pgnum) {
+    // allocate a page table entry if it does not exist
+    // if (caller->mm->pgd[pgn + i] == 0) {
+      
+    // }
+    uint32_t * pte = malloc(sizeof(uint32_t));
+    if (!pte) {
+      return -1; // error: failed to allocate memory for PTE
+    }
+    init_pte(pte, 1, fpit->fpn, 0,0,0,0); // init pte and map it to the free frame
+    caller->mm->pgd[pgn + pgit] = pte;
+    fpit = fpit->fp_next;
+    frames->fp_next = NULL;
+    free(frames);
+    /* Tracking for later page replacement activities (if needed)
+    * Enqueue new usage page */
+    enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit);
+    ret_rg->rg_end = ret_rg->rg_end + PAGING_PAGESZ;
+    pgit++;
+  }
   /* TODO map range of frame to address space 
    *      [addr to addr + pgnum*PAGING_PAGESZ
    *      in page table caller->mm->pgd[]
    */
 
-   /* Tracking for later page replacement activities (if needed)
-    * Enqueue new usage page */
-   enlist_pgn_node(&caller->mm->fifo_pgn, pgn+pgit);
 
 
   return 0;
@@ -115,23 +132,52 @@ int vmap_page_range(struct pcb_t *caller, // process call
  * @frm_lst   : frame list
  */
 
+
 int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struct** frm_lst)
 {
-  int pgit, fpn;
-  //struct framephy_struct *newfp_str;
+    int pgit, fpn;
 
-  for(pgit = 0; pgit < req_pgnum; pgit++)
-  {
-    if(MEMPHY_get_freefp(caller->mram, &fpn) == 0)
-   {
-     
-   } else {  // ERROR CODE of obtaining somes but not enough frames
-   } 
- }
+    //struct framephy_struct *newfp_str;
+    for(pgit = 0; pgit < req_pgnum; pgit++)
+    {
+      if(MEMPHY_get_freefp(caller->mram, &fpn) == 0)  
+    {
+      struct framephy_struct *newNode = malloc(sizeof(struct framephy_struct));
+      if (newNode == NULL) {
+        printf("Error: failed to allocate memory for new node\n");
+        return -1;
+      }
+      newNode->fpn = fpn;
+      newNode->fp_next = *frm_lst;
+      newNode->owner = caller->mm;
+      *frm_lst = newNode;
+    } 
+    else {  // ERROR CODE of obtaining somes but not enough frames
+      int vicpgn, swpfpn;
+       /* Find victim page */
+      find_victim_page(caller->mm, &vicpgn);
 
-  return 0;
+      /* Get free frame in MEMSWP */
+      MEMPHY_get_freefp(caller->active_mswp, &swpfpn);
+      /* Copy frame to swap */
+      uint32_t vicpte = caller->mm->pgd[vicpgn];
+      int vicfpn = PAGING_FPN(vicpte);
+      __swap_cp_page(caller->mram,vicfpn,caller->active_mswp, swpfpn);
+      int PAGING_SWAP_TYPE = GETVAL(vicpte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
+      /* Update page table */
+      pte_set_swap(&vicpte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
+      // Now that address at vicfpn is freed, assign to frame list for later use
+      struct framephy_struct *newNode = malloc(sizeof(struct framephy_struct));
+      fpn = vicfpn;
+      newNode->fpn = fpn;
+      newNode->fp_next = *frm_lst;
+      newNode->owner = caller->mm;
+      *frm_lst = newNode;
+    } 
+  }
+
+    return 0;
 }
-
 
 /* 
  * vm_map_ram - do the mapping all vm are to ram storage device
@@ -250,11 +296,22 @@ int enlist_pgn_node(struct pgn_t **plist, int pgn)
   struct pgn_t* pnode = malloc(sizeof(struct pgn_t));
 
   pnode->pgn = pgn;
-  pnode->pg_next = *plist;
-  *plist = pnode;
+  /* add to head */
+  // pnode->pg_next = *plist;
+  // *plist = pnode;
+    /* add to tail */
+  pnode->pg_next = NULL;
+  struct pgn_t* temp = malloc(sizeof(struct pgn_t));
+  temp = *plist;
+  while(temp->pg_next) {
+    if(temp->pgn == pgn) return -1; /* duplicate pgn */
+    temp = temp->pg_next;
+  }
+  temp->pg_next = pnode;
 
   return 0;
 }
+
 
 int print_list_fp(struct framephy_struct *ifp)
 {
