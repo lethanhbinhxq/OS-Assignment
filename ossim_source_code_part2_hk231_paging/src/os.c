@@ -41,7 +41,7 @@ struct cpu_args {
 	int id;
 };
 
-
+// pretty safe for cpu_routine -> no need to lock
 static void * cpu_routine(void * args) {
 	struct timer_id_t * timer_id = ((struct cpu_args*)args)->timer_id;
 	int id = ((struct cpu_args*)args)->id;
@@ -98,6 +98,7 @@ static void * cpu_routine(void * args) {
 	pthread_exit(NULL);
 }
 
+// where you should consider lock -> lock in MEMPHY
 static void * ld_routine(void * args) {
 #ifdef MM_PAGING
 	struct memphy_struct* mram = ((struct mmpaging_ld_args *)args)->mram;
@@ -119,7 +120,7 @@ static void * ld_routine(void * args) {
 		}
 #ifdef MM_PAGING
 		proc->mm = malloc(sizeof(struct mm_struct));
-		init_mm(proc->mm, proc);
+		init_mm(proc->mm, proc); 
 		proc->mram = mram;
 		proc->mswp = mswp;
 		proc->active_mswp = active_mswp;
@@ -137,6 +138,7 @@ static void * ld_routine(void * args) {
 	detach_event(timer_id);
 	pthread_exit(NULL);
 }
+// END lock
 
 static void read_config(const char * path) {
 	FILE * file;
@@ -220,7 +222,7 @@ int main(int argc, char * argv[]) {
 	struct timer_id_t * ld_event = attach_event();
 	start_timer();
 
-#ifdef MM_PAGING
+#ifdef MM_PAGING	// No need for lock in this ifdef
 	/* Init all MEMPHY include 1 MEMRAM and n of MEMSWP */
 	int rdmflag = 1; /* By default memphy is RANDOM ACCESS MEMORY */
 
@@ -229,13 +231,13 @@ int main(int argc, char * argv[]) {
 
 
 	/* Create MEM RAM */
-	init_memphy(&mram, memramsz, rdmflag);
+	init_memphy(&mram, memramsz, rdmflag); //memramsz from read_config
 
         /* Create all MEM SWAP */ 
 	int sit;
 	for(sit = 0; sit < PAGING_MAX_MMSWP; sit++)
 	       init_memphy(&mswp[sit], memswpsz[sit], rdmflag);
-
+	// input data to mswp
 	/* In Paging mode, it needs passing the system mem to each PCB through loader*/
 	struct mmpaging_ld_args *mm_ld_args = malloc(sizeof(struct mmpaging_ld_args));
 
@@ -243,15 +245,18 @@ int main(int argc, char * argv[]) {
 	mm_ld_args->mram = (struct memphy_struct *) &mram;
 	mm_ld_args->mswp = (struct memphy_struct**) &mswp;
 	mm_ld_args->active_mswp = (struct memphy_struct *) &mswp[0];
+	// active_mswp is the first of mswp, which is the only SWAP we used
 #endif
 
 
-	/* Init scheduler */
+	/* Init scheduler */ // lock initialized inside 
 	init_scheduler();
 
 	/* Run CPU and loader */
 #ifdef MM_PAGING
 	pthread_create(&ld, NULL, ld_routine, (void*)mm_ld_args);
+	// In summary, the code is creating a new thread to execute the ld_routine() function 
+	// with a pointer to a struct mmpaging_ld_args as an argumen to ld_routine
 #else
 	pthread_create(&ld, NULL, ld_routine, (void*)ld_event);
 #endif
