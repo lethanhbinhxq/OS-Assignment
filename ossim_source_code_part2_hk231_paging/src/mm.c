@@ -105,7 +105,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
       return -1; // error: failed to allocate memory for PTE
     }
     init_pte(pte, 1, fpit->fpn, 0,0,0,0); // init pte and map it to the free frame
-    caller->mm->pgd[pgn + pgit] = pte;
+    caller->mm->pgd[pgn + pgit] = *pte;
     fpit = fpit->fp_next;
     frames->fp_next = NULL;
     free(frames);

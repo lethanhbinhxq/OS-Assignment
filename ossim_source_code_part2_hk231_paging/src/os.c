@@ -193,7 +193,8 @@ static void read_config(const char * path) {
 #endif
 		strcat(ld_processes.path[i], proc);
 	}
-	fclose(path);
+	// fclose(path);	src code (dump)
+	fclose(file);
 }
 
 int main(int argc, char * argv[]) {

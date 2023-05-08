@@ -436,16 +436,16 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
   struct vm_area_struct *vma = caller->mm->mmap;
   // Check if the VM area is within the address space
   if (vmastart < 0) {
-    return -EINVAL; // Invalid argument error
+    return -1; // Invalid argument error
   }
   // Check if the VM area is within a valid range
   if (vmastart >= vmaend) {
-    return -EINVAL; // Invalid argument error
+    return -1; // Invalid argument error
   }
   // Check for overlaps with existing VM areas
   while (vma != NULL) {
     if (vma->vm_id != vmaid && vma->vm_end > vmastart && vma->vm_start < vmaend) {
-      return -EINVAL; // Invalid argument error
+      return -1; // Invalid argument error
     }
     vma = vma->vm_next;
   }
@@ -479,7 +479,7 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   if (vm_map_ram(caller, area->rg_start, area->rg_end, 
                     old_end, incnumpage , newrg) < 0)
     return -1; /* Map the memory to MEMRAM */
-  enlist_vm_freerg_list(&caller->mm, *newrg);
+  enlist_vm_freerg_list(caller->mm, *newrg);
   return 0;
 
 }
