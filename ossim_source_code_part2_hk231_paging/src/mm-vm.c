@@ -117,6 +117,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
 
   *alloc_addr = old_sbrk;
+  cur_vma->sbrk += inc_sz;
 
   return 0;
 }
@@ -130,8 +131,9 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
  */
 int __free(struct pcb_t *caller, int vmaid, int rgid)
 {
+  // CHANGE
   struct vm_rg_struct rgnode;
-
+  // END CHANGE
   if(rgid < 0 || rgid > PAGING_MAX_SYMTBL_SZ)
     return -1;
 
@@ -147,7 +149,9 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
   rgnode.rg_next = symrg->rg_next;
 
   /*free the memory*/
-  free(symrg);
+  symrg->rg_start = 0;
+  symrg->rg_end = 0;
+  symrg->rg_next = NULL;
 
   /*enlist the obsoleted memory region */
   enlist_vm_freerg_list(caller->mm, rgnode);
@@ -433,7 +437,7 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
   //struct vm_area_struct *vma = caller->mm->mmap;
 
   /* TODO validate the planned memory area is not overlapped */
-  struct vm_area_struct *vma = caller->mm->mmap;
+  // struct vm_area_struct *vma = caller->mm->mmap;
   // Check if the VM area is within the address space
   if (vmastart < 0) {
     return -1; // Invalid argument error
@@ -443,12 +447,12 @@ int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int 
     return -1; // Invalid argument error
   }
   // Check for overlaps with existing VM areas
-  while (vma != NULL) {
-    if (vma->vm_id != vmaid && vma->vm_end > vmastart && vma->vm_start < vmaend) {
-      return -1; // Invalid argument error
-    }
-    vma = vma->vm_next;
-  }
+  // while (vma != NULL) {
+  //   if (vma->vm_id != vmaid && vma->vm_end > vmastart && vma->vm_start < vmaend) {
+  //     return -1; // Invalid argument error
+  //   }
+  //   vma = vma->vm_next;
+  // }
 
   return 0;
 }
@@ -479,7 +483,7 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   if (vm_map_ram(caller, area->rg_start, area->rg_end, 
                     old_end, incnumpage , newrg) < 0)
     return -1; /* Map the memory to MEMRAM */
-  enlist_vm_freerg_list(caller->mm, *newrg);
+  // enlist_vm_freerg_list(caller->mm, *newrg);
   return 0;
 
 }
@@ -557,6 +561,7 @@ int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_s
           rgit->rg_next = NULL;
         }
       }
+      break;
     }
     else
     {

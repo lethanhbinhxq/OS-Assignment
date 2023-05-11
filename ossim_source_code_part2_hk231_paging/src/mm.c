@@ -106,14 +106,15 @@ int vmap_page_range(struct pcb_t *caller, // process call
     }
     init_pte(pte, 1, fpit->fpn, 0,0,0,0); // init pte and map it to the free frame
     caller->mm->pgd[pgn + pgit] = *pte;
+    struct framephy_struct *temp = fpit;
     fpit = fpit->fp_next;
-    frames->fp_next = NULL;
-    free(frames);
     /* Tracking for later page replacement activities (if needed)
     * Enqueue new usage page */
     enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit);
     ret_rg->rg_end = ret_rg->rg_end + PAGING_PAGESZ;
+    free(temp);
     pgit++;
+    
   }
   /* TODO map range of frame to address space 
    *      [addr to addr + pgnum*PAGING_PAGESZ
@@ -217,7 +218,7 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
   /* it leaves the case of memory is enough but half in ram, half in swap
    * do the swaping all to swapper to get the all in ram */
   vmap_page_range(caller, mapstart, incpgnum, frm_lst, ret_rg);
-
+  free(frm_lst);
   return 0;
 }
 
@@ -263,12 +264,11 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   vma->sbrk = vma->vm_start;
   struct vm_rg_struct *first_rg = init_vm_rg(vma->vm_start, vma->vm_end);
   enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
-
+  mm->fifo_pgn = NULL;
   vma->vm_next = NULL;
   vma->vm_mm = mm; /*point back to vma owner */
 
   mm->mmap = vma;
-
   return 0;
 }
 
@@ -293,18 +293,28 @@ int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode)
 
 int enlist_pgn_node(struct pgn_t **plist, int pgn)
 {
+  if (*plist == NULL) {
+    /* list is empty, add to head */
+    *plist = malloc(sizeof(struct pgn_t));
+    (*plist)->pgn = pgn;
+    (*plist)->pg_next = NULL;
+    return 0;
+  }
+  struct pgn_t* temp = *plist;
   struct pgn_t* pnode = malloc(sizeof(struct pgn_t));
 
   pnode->pgn = pgn;
+  pnode->pg_next = NULL;
   /* add to head */
   // pnode->pg_next = *plist;
   // *plist = pnode;
     /* add to tail */
-  pnode->pg_next = NULL;
-  struct pgn_t* temp = malloc(sizeof(struct pgn_t));
-  temp = *plist;
-  while(temp->pg_next) {
-    if(temp->pgn == pgn) return -1; /* duplicate pgn */
+  
+  while(temp->pg_next != NULL) {
+    if(temp->pgn == pgn) {
+      free(pnode);
+      return -1; /* duplicate pgn */
+    }
     temp = temp->pg_next;
   }
   temp->pg_next = pnode;
