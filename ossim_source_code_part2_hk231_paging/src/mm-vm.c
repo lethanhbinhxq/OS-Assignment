@@ -16,16 +16,30 @@
  */
 int enlist_vm_freerg_list(struct mm_struct *mm, struct vm_rg_struct rg_elmt)
 {
-  struct vm_rg_struct *rg_node = mm->mmap->vm_freerg_list;
-
   if (rg_elmt.rg_start >= rg_elmt.rg_end)
     return -1;
 
-  if (rg_node != NULL)
-    rg_elmt.rg_next = rg_node;
+  if (mm->mmap->vm_freerg_list == NULL) {
+    mm->mmap->vm_freerg_list = malloc(sizeof(struct vm_rg_struct));
+    mm->mmap->vm_freerg_list->rg_start = rg_elmt.rg_start;
+    mm->mmap->vm_freerg_list->rg_end = rg_elmt.rg_end;
+    mm->mmap->vm_freerg_list->rg_next = rg_elmt.rg_next;
+    return 0;
+  }
 
+  // if (rg_node != NULL)
+  //   rg_elmt.rg_next = rg_node;
+  struct vm_rg_struct *temp = mm->mmap->vm_freerg_list;
+  struct vm_rg_struct *rg_node = malloc(sizeof(struct vm_rg_struct));
+
+  rg_node->rg_start = rg_elmt.rg_start;
+  rg_node->rg_end = rg_elmt.rg_end;
+  rg_node->rg_next = rg_elmt.rg_next;
   /* Enlist the new region */
-  mm->mmap->vm_freerg_list = &rg_elmt;
+  while(temp->rg_next != NULL) {
+    temp = temp->rg_next;
+  }
+  temp->rg_next = rg_node;
 
   return 0;
 }
@@ -113,10 +127,14 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
   }
 
   /*Successful increase limit */
-  caller->mm->symrgtbl[rgid].rg_start = old_sbrk;
-  caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
+  if (get_free_vmrg_area(caller, vmaid, size, &rgnode) == 0)
+  {
+    caller->mm->symrgtbl[rgid].rg_start = old_sbrk;
+    caller->mm->symrgtbl[rgid].rg_end = old_sbrk + size;
 
-  *alloc_addr = old_sbrk;
+    *alloc_addr = old_sbrk;
+  }
+  
   cur_vma->sbrk += inc_sz;
 
   return 0;
@@ -139,23 +157,38 @@ int __free(struct pcb_t *caller, int vmaid, int rgid)
 
   /* TODO: Manage the collect freed region to freerg_list */
   struct vm_area_struct *vma = get_vma_by_num(caller->mm, vmaid);
-
+  
   /* Find the region in the symbol table */
   struct vm_rg_struct *symrg = &(vma->vm_mm->symrgtbl[rgid]);
-
+  // May delete
+  // int del_sz = PAGING_PAGE_ALIGNSZ(symrg->rg_end - symrg->rg_start);
+  // int pgn = PAGING_PGN(symrg->rg_start);
+  // for (int i=0;i < del_sz; i++) {
+  //   int fpn = PAGING_FPN(caller->mm->pgd[pgn+i]);
+    
+  //   CLRBIT(caller->mm->pgd[pgn + i], PAGING_PTE_PRESENT_MASK);
+  // }
+  //
+  
+  // CHANGE
+  // struct vm_rg_struct *rgnode = malloc(sizeof(struct vm_rg_struct));
+  // rgnode->rg_start = symrg->rg_start;
+  // rgnode->rg_end = symrg->rg_end;
+  // rgnode->rg_next = symrg->rg_next;
+  // END CHANGE
   /* Update the region node */
   rgnode.rg_start = symrg->rg_start;
   rgnode.rg_end = symrg->rg_end;
   rgnode.rg_next = symrg->rg_next;
 
-  /*free the memory*/
-  symrg->rg_start = 0;
-  symrg->rg_end = 0;
-  symrg->rg_next = NULL;
-
   /*enlist the obsoleted memory region */
   enlist_vm_freerg_list(caller->mm, rgnode);
 
+  // enlist_vm_freerg_list(caller->mm, *rgnode);
+   /*free the memory*/
+  symrg->rg_start = 0;
+  symrg->rg_end = 0;
+  symrg->rg_next = NULL;
   return 0;
 }
 
@@ -483,7 +516,8 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
   if (vm_map_ram(caller, area->rg_start, area->rg_end, 
                     old_end, incnumpage , newrg) < 0)
     return -1; /* Map the memory to MEMRAM */
-  // enlist_vm_freerg_list(caller->mm, *newrg);
+  enlist_vm_freerg_list(caller->mm, *newrg);
+  free(area);
   return 0;
 
 }

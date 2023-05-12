@@ -21,7 +21,7 @@ int init_pte(uint32_t *pte,
 {
   if (pre != 0) {
     if (swp == 0) { // Non swap ~ page online
-      if (fpn == 0) 
+      if (fpn == -1) 
         return -1; // Invalid setting
 
       /* Valid setting with FPN */
@@ -93,19 +93,24 @@ int vmap_page_range(struct pcb_t *caller, // process call
 
   ret_rg->rg_end = ret_rg->rg_start = addr; // at least the very first space is usable
 
-  struct framephy_struct *fpit = frames;
+  struct framephy_struct *fpit = frames; 
 
   while (pgit < pgnum) {
     // allocate a page table entry if it does not exist
     // if (caller->mm->pgd[pgn + i] == 0) {
       
     // }
-    uint32_t * pte = malloc(sizeof(uint32_t));
-    if (!pte) {
-      return -1; // error: failed to allocate memory for PTE
-    }
-    init_pte(pte, 1, fpit->fpn, 0,0,0,0); // init pte and map it to the free frame
-    caller->mm->pgd[pgn + pgit] = *pte;
+
+    // Change
+    // uint32_t * pte = malloc(sizeof(uint32_t));
+    init_pte(&caller->mm->pgd[pgn + pgit], 1, fpit->fpn, 0,0,0,0);
+    // if (!pte) {
+    //   return -1; // error: failed to allocate memory for PTE
+    // }
+    // init_pte(pte, 1, fpit->fpn, 0,0,0,0); // init pte and map it to the free frame
+    // caller->mm->pgd[pgn + pgit] = *pte;
+    // End change
+
     struct framephy_struct *temp = fpit;
     fpit = fpit->fp_next;
     /* Tracking for later page replacement activities (if needed)
@@ -218,7 +223,7 @@ int vm_map_ram(struct pcb_t *caller, int astart, int aend, int mapstart, int inc
   /* it leaves the case of memory is enough but half in ram, half in swap
    * do the swaping all to swapper to get the all in ram */
   vmap_page_range(caller, mapstart, incpgnum, frm_lst, ret_rg);
-  free(frm_lst);
+  // free(frm_lst);
   return 0;
 }
 
@@ -262,8 +267,11 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   vma->vm_start = 0;
   vma->vm_end = vma->vm_start;
   vma->sbrk = vma->vm_start;
-  struct vm_rg_struct *first_rg = init_vm_rg(vma->vm_start, vma->vm_end);
-  enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
+  // Change
+  // struct vm_rg_struct *first_rg = init_vm_rg(vma->vm_start, vma->vm_end);
+  // enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
+  // End change
+  vma->vm_freerg_list = NULL;
   mm->fifo_pgn = NULL;
   vma->vm_next = NULL;
   vma->vm_mm = mm; /*point back to vma owner */
@@ -283,13 +291,19 @@ struct vm_rg_struct* init_vm_rg(int rg_start, int rg_end)
   return rgnode;
 }
 
+// Change
 int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode)
 {
+  if (*rglist == NULL) {
+    *rglist = rgnode;
+    return 0;
+  }
   rgnode->rg_next = *rglist;
   *rglist = rgnode;
 
   return 0;
 }
+// End change
 
 int enlist_pgn_node(struct pgn_t **plist, int pgn)
 {
