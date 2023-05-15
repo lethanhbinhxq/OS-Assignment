@@ -534,13 +534,21 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
 int find_victim_page(struct mm_struct *mm, struct pgn_t **retpgn) 
 {
   struct pgn_t *pg = mm->fifo_pgn;
-  if(pg->pgn == -9999) pg = pg->pg_next;
-
+  printf("In victim\n");
+  print_list_pgn(mm->fifo_pgn);
+  if(pg->pgn == -9999)
+    pg = pg->pg_next;
+    
   /* TODO: Implement the theorical mechanism to find the victim page */
   /* Store the page number of the victim page */
-  *retpgn = pg;
+  *retpgn = malloc(sizeof(struct pgn_t));
+  (*retpgn)->pgn = pg->pgn;
+  (*retpgn)->addr = pg->addr;
+  (*retpgn)->pg_next = pg->pg_next;
+  
   /* update the fifo_pgn */
-  mm->fifo_pgn = mm->fifo_pgn->pg_next;
+  mm->fifo_pgn->pg_next = pg->pg_next;
+  
   /* Add the victim page to the end of the FIFO queue */
   // enlist_pgn_node(&mm->fifo_pgn, pg->pgn);
   free(pg);

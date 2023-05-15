@@ -160,10 +160,11 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
     } 
     else {  // ERROR CODE of obtaining somes but not enough frames
       int swpfpn;
-      struct pgn_t *vicpgn;
+      struct pgn_t *vicpgn = NULL;
        /* Find victim page */
       find_victim_page(caller->mm, &vicpgn);
-
+      printf("After in vicime\n");
+      print_list_pgn(caller->mm->fifo_pgn);
       /* Get free frame in MEMSWP */
       MEMPHY_get_freefp(caller->active_mswp, &swpfpn);
       /* Copy frame to swap */
