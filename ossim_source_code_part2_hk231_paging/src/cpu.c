@@ -61,6 +61,7 @@ int run(struct pcb_t * proc) {
 	case ALLOC:
 #ifdef MM_PAGING
 		stat = pgalloc(proc, ins.arg_0, ins.arg_1);
+		print_list_pgn(proc->mm->fifo_pgn);
 #else
 		stat = alloc(proc, ins.arg_0, ins.arg_1);
 #endif
@@ -68,6 +69,7 @@ int run(struct pcb_t * proc) {
 	case FREE:
 #ifdef MM_PAGING
 		stat = pgfree_data(proc, ins.arg_0);
+		print_list_pgn(proc->mm->fifo_pgn);
 #else
 		stat = free_data(proc, ins.arg_0);
 #endif
@@ -75,6 +77,7 @@ int run(struct pcb_t * proc) {
 	case READ:
 #ifdef MM_PAGING
 		stat = pgread(proc, ins.arg_0, ins.arg_1, ins.arg_2);
+		print_list_pgn(proc->mm->fifo_pgn);
 #else
 		stat = read(proc, ins.arg_0, ins.arg_1, ins.arg_2);
 #endif
@@ -82,6 +85,7 @@ int run(struct pcb_t * proc) {
 	case WRITE:
 #ifdef MM_PAGING
 		stat = pgwrite(proc, ins.arg_0, ins.arg_1, ins.arg_2);
+		print_list_pgn(proc->mm->fifo_pgn);
 #else
 		stat = write(proc, ins.arg_0, ins.arg_1, ins.arg_2);
 #endif

@@ -419,7 +419,7 @@ int print_pgtbl(struct pcb_t *caller, uint32_t start, uint32_t end)
 
   for(pgit = pgn_start; pgit < pgn_end; pgit++)
   {
-     printf("%08ld: %08x\n", pgit * sizeof(uint32_t), caller->mm->pgd[pgit]);
+     printf("%08ld: %08x, (%8p)\n", pgit * sizeof(uint32_t), caller->mm->pgd[pgit], &caller->mm->pgd[pgit]);
   }
 
   return 0;

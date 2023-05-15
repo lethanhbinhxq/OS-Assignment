@@ -232,8 +232,8 @@ int pgfree_data(struct pcb_t *proc, uint32_t reg_index)
 int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 {
   uint32_t pte = mm->pgd[pgn];
- 
-  if (!PAGING_PAGE_PRESENT(pte))
+  printf("%2d\n",PAGING_SWAP(pte));
+  if (PAGING_SWAP(pte))
   { /* Page is not online, make it actively living */
     int vicpgn, swpfpn; 
     //int vicfpn;
@@ -271,9 +271,10 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     MEMPHY_put_freefp(caller->active_mswp, tgtfpn);
     enlist_pgn_node(&caller->mm->fifo_pgn,pgn);
   }
-
+  // printf("%2u, %2u, %2u\n", PAGING_FPN(mm->pgd[0]), PAGING_FPN(80000001),PAGING_FPN(pte));
+  // printf("%2u, %2u, %2u\n", GETVAL(mm->pgd[0], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT), GETVAL(mm->pgd[1], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT), GETVAL(mm->pgd[2], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT));
   *fpn = PAGING_FPN(pte);
-
+  printf("fpn: %2d\n", *fpn);
   return 0;
 }
 
@@ -404,7 +405,9 @@ int pgwrite(
 #endif
   MEMPHY_dump(proc->mram);
 #endif
-
+  if (proc->mm->symrgtbl[destination].rg_start == proc->mm->symrgtbl[destination].rg_end) {
+    pgalloc(proc, 100, destination);
+  }
   return __write(proc, 0, destination, offset, data);
 }
 

@@ -8,6 +8,8 @@
 typedef char BYTE;
 typedef uint32_t addr_t;
 //typedef unsigned int uint32_t;
+// extern struct memphy_struct mram;
+// extern struct memphy_struct mswp[PAGING_MAX_MMSWP];
 
 struct pgn_t{
    int pgn;
@@ -80,6 +82,9 @@ struct memphy_struct {
    /* Management structure */
    struct framephy_struct *free_fp_list;
    struct framephy_struct *used_fp_list;
+
+   // pthread_mutex_t storage_lock;
+   // pthread_mutex_t free_fp_lock;
 };
 
 #endif

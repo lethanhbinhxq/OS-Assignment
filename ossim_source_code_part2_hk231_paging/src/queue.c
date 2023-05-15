@@ -23,7 +23,7 @@ struct pcb_t * dequeue(struct queue_t * q) {
         if(!empty(q)){
                 int getIndex = 0;
                 for(int i = 1; i < q->size; i++){
-                        if(q->proc[getIndex]->priority > q->proc[i]->priority){
+                        if(q->proc[getIndex]->priority >= q->proc[i]->priority){
                                 getIndex = i;
                         }
                 }
