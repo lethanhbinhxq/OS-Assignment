@@ -94,7 +94,7 @@
 /* VM region prototypes */
 struct vm_rg_struct * init_vm_rg(int rg_start, int rg_endi);
 int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode);
-int enlist_pgn_node(struct pgn_t **pgnlist, int pgn);
+int enlist_pgn_node(struct pgn_t **pgnlist, int pgn, uint32_t pte_addr);
 int vmap_page_range(struct pcb_t *caller, int addr, int pgnum, 
                     struct framephy_struct *frames, struct vm_rg_struct *ret_rg);
 int vm_map_ram(struct pcb_t *caller, int astart, int send, int mapstart, int incpgnum, struct vm_rg_struct *ret_rg);
@@ -114,7 +114,7 @@ int __alloc(struct pcb_t *caller, int vmaid, int rgid, int size, int *alloc_addr
 int __free(struct pcb_t *caller, int vmaid, int rgid);
 int __read(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE *data);
 int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value);
-int init_mm(struct mm_struct *mm, struct pcb_t *caller);
+int init_mm(struct mm_struct *mm, struct pcb_t *caller, struct pgn_t **fifo_pgn);
 
 /* VM prototypes */
 int pgalloc(struct pcb_t *proc, uint32_t size, uint32_t reg_index);
@@ -134,7 +134,7 @@ struct vm_rg_struct * get_symrg_byid(struct mm_struct* mm, int rgid);
 int validate_overlap_vm_area(struct pcb_t *caller, int vmaid, int vmastart, int vmaend);
 int get_free_vmrg_area(struct pcb_t *caller, int vmaid, int size, struct vm_rg_struct *newrg);
 int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz);
-int find_victim_page(struct mm_struct* mm, int *pgn);
+int find_victim_page(struct mm_struct *mm, struct pgn_t **retpgn);
 struct vm_area_struct *get_vma_by_num(struct mm_struct *mm, int vmaid);
 
 /* MEM/PHY protypes */

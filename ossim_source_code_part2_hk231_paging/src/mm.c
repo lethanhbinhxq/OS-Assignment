@@ -115,7 +115,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
     fpit = fpit->fp_next;
     /* Tracking for later page replacement activities (if needed)
     * Enqueue new usage page */
-    enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit);
+    enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit, caller->mm->pgd[pgn + pgit]);
     ret_rg->rg_end = ret_rg->rg_end + PAGING_PAGESZ;
     free(temp);
     pgit++;
@@ -159,14 +159,15 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
       *frm_lst = newNode;
     } 
     else {  // ERROR CODE of obtaining somes but not enough frames
-      int vicpgn, swpfpn;
+      int swpfpn;
+      struct pgn_t *vicpgn;
        /* Find victim page */
       find_victim_page(caller->mm, &vicpgn);
 
       /* Get free frame in MEMSWP */
       MEMPHY_get_freefp(caller->active_mswp, &swpfpn);
       /* Copy frame to swap */
-      uint32_t vicpte = caller->mm->pgd[vicpgn];
+      uint32_t vicpte = vicpgn->addr;
       int vicfpn = PAGING_FPN(vicpte);
       __swap_cp_page(caller->mram,vicfpn,caller->active_mswp, swpfpn);
       int PAGING_SWAP_TYPE = GETVAL(vicpte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
@@ -256,7 +257,7 @@ int __swap_cp_page(struct memphy_struct *mpsrc, int srcfpn,
  * @mm:     self mm
  * @caller: mm owner
  */
-int init_mm(struct mm_struct *mm, struct pcb_t *caller)
+int init_mm(struct mm_struct *mm, struct pcb_t *caller, struct pgn_t **fifo_pgn)
 {
   struct vm_area_struct * vma = malloc(sizeof(struct vm_area_struct));
 
@@ -272,7 +273,7 @@ int init_mm(struct mm_struct *mm, struct pcb_t *caller)
   // enlist_vm_rg_node(&vma->vm_freerg_list, first_rg);
   // End change
   vma->vm_freerg_list = NULL;
-  mm->fifo_pgn = NULL;
+  mm->fifo_pgn = *fifo_pgn;
   vma->vm_next = NULL;
   vma->vm_mm = mm; /*point back to vma owner */
 
@@ -305,7 +306,7 @@ int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode)
 }
 // End change
 
-int enlist_pgn_node(struct pgn_t **plist, int pgn)
+int enlist_pgn_node(struct pgn_t **plist, int pgn, uint32_t pte_addr)
 {
   if (*plist == NULL) {
     /* list is empty, add to head */
@@ -318,6 +319,7 @@ int enlist_pgn_node(struct pgn_t **plist, int pgn)
   struct pgn_t* pnode = malloc(sizeof(struct pgn_t));
 
   pnode->pgn = pgn;
+  pnode->addr = pte_addr;
   pnode->pg_next = NULL;
   /* add to head */
   // pnode->pg_next = *plist;
@@ -325,7 +327,7 @@ int enlist_pgn_node(struct pgn_t **plist, int pgn)
     /* add to tail */
   
   while(temp->pg_next != NULL) {
-    if(temp->pgn == pgn) {
+    if(temp->addr == pte_addr) {
       free(pnode);
       return -1; /* duplicate pgn */
     }

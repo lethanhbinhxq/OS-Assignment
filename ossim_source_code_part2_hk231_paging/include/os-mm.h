@@ -13,6 +13,7 @@ typedef uint32_t addr_t;
 
 struct pgn_t{
    int pgn;
+   uint32_t addr ;
    struct pgn_t *pg_next; 
 };
 

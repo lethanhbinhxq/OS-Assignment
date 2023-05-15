@@ -24,6 +24,7 @@ struct mmpaging_ld_args {
 	struct memphy_struct **mswp;
 	struct memphy_struct *active_mswp;
 	struct timer_id_t  *timer_id;
+	// struct pgn_t *FIFO_PGN;
 };
 #endif
 
@@ -105,6 +106,9 @@ static void * ld_routine(void * args) {
 	struct memphy_struct** mswp = ((struct mmpaging_ld_args *)args)->mswp;
 	struct memphy_struct* active_mswp = ((struct mmpaging_ld_args *)args)->active_mswp;
 	struct timer_id_t * timer_id = ((struct mmpaging_ld_args *)args)->timer_id;
+	struct pgn_t *FIFO_PGN = malloc(sizeof(struct pgn_t));
+	FIFO_PGN->pgn = -9999;
+	FIFO_PGN->pg_next = NULL;
 #else
 	struct timer_id_t * timer_id = (struct timer_id_t*)args;
 #endif
@@ -120,7 +124,7 @@ static void * ld_routine(void * args) {
 		}
 #ifdef MM_PAGING
 		proc->mm = malloc(sizeof(struct mm_struct));
-		init_mm(proc->mm, proc); 
+		init_mm(proc->mm, proc, &FIFO_PGN); 
 		proc->mram = mram;
 		proc->mswp = mswp;
 		proc->active_mswp = active_mswp;
@@ -278,6 +282,5 @@ int main(int argc, char * argv[]) {
 	return 0;
 
 }
-
 
 

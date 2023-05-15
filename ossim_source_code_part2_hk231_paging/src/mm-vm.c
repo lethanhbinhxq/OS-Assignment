@@ -235,7 +235,8 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
   printf("%2d\n",PAGING_SWAP(pte));
   if (PAGING_SWAP(pte))
   { /* Page is not online, make it actively living */
-    int vicpgn, swpfpn; 
+    int swpfpn; 
+    struct pgn_t *vicpgn;
     //int vicfpn;
     //uint32_t vicpte;
 
@@ -260,7 +261,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
 
     /* Update its online status of the target page */
     //pte_set_fpn() & mm->pgd[pgn];
-    uint32_t vicpte = mm->pgd[vicpgn];
+    uint32_t vicpte = vicpgn->addr;
     int vicfpn = PAGING_FPN(vicpte);
     __swap_cp_page(caller->mram, vicfpn, caller->active_mswp, swpfpn);
     __swap_cp_page(caller->active_mswp, tgtfpn, caller->mram, vicfpn);
@@ -269,7 +270,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     pte_set_swap(&pte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
     pte_set_fpn(&vicpte, tgtfpn);
     MEMPHY_put_freefp(caller->active_mswp, tgtfpn);
-    enlist_pgn_node(&caller->mm->fifo_pgn,pgn);
+    enlist_pgn_node(&caller->mm->fifo_pgn,pgn, caller->mm->pgd[pgn]);
   }
   // printf("%2u, %2u, %2u\n", PAGING_FPN(mm->pgd[0]), PAGING_FPN(80000001),PAGING_FPN(pte));
   // printf("%2u, %2u, %2u\n", GETVAL(mm->pgd[0], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT), GETVAL(mm->pgd[1], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT), GETVAL(mm->pgd[2], PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT));
@@ -530,13 +531,14 @@ int inc_vma_limit(struct pcb_t *caller, int vmaid, int inc_sz)
  *@pgn: return page number
  *
  */
-int find_victim_page(struct mm_struct *mm, int *retpgn) 
+int find_victim_page(struct mm_struct *mm, struct pgn_t **retpgn) 
 {
   struct pgn_t *pg = mm->fifo_pgn;
+  if(pg->pgn == -9999) pg = pg->pg_next;
 
   /* TODO: Implement the theorical mechanism to find the victim page */
   /* Store the page number of the victim page */
-  *retpgn = pg->pgn;
+  *retpgn = pg;
   /* update the fifo_pgn */
   mm->fifo_pgn = mm->fifo_pgn->pg_next;
   /* Add the victim page to the end of the FIFO queue */
