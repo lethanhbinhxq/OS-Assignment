@@ -169,12 +169,13 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
       MEMPHY_get_freefp(caller->active_mswp, &swpfpn);
       /* Copy frame to swap */
       uint32_t vicpte = vicpgn->addr;
-      int vicfpn = PAGING_FPN(vicpte);
+      int vicfpn = GETVAL(vicpte, PAGING_PTE_FPN_MASK, PAGING_PTE_FPN_LOBIT);
       __swap_cp_page(caller->mram,vicfpn,caller->active_mswp, swpfpn);
       int PAGING_SWAP_TYPE = GETVAL(vicpte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
       /* Update page table */
-      pte_set_swap(&vicpte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
+      pte_set_swap(&vicpgn->addr, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
       // Now that address at vicfpn is freed, assign to frame list for later use
+      enlist_pgn_node(&caller->mm->fifo_pgn,vicpgn->pgn, vicpgn->addr);
       struct framephy_struct *newNode = malloc(sizeof(struct framephy_struct));
       fpn = vicfpn;
       newNode->fpn = fpn;

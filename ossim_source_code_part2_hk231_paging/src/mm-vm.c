@@ -236,7 +236,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
   if (PAGING_SWAP(pte))
   { /* Page is not online, make it actively living */
     int swpfpn; 
-    struct pgn_t *vicpgn;
+    struct pgn_t *vicpgn = NULL;
     //int vicfpn;
     //uint32_t vicpte;
 
@@ -267,7 +267,7 @@ int pg_getpage(struct mm_struct *mm, int pgn, int *fpn, struct pcb_t *caller)
     __swap_cp_page(caller->active_mswp, tgtfpn, caller->mram, vicfpn);
     int PAGING_SWAP_TYPE = GETVAL(pte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
     //int PAGING_SWAP_TYPE = (pte & PAGING_PTE_SWPTYP_MASK) >> PAGING_PTE_SWPTYP_LOBIT;
-    pte_set_swap(&pte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
+    pte_set_swap(&mm->pgd[pgn], PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
     pte_set_fpn(&vicpte, tgtfpn);
     MEMPHY_put_freefp(caller->active_mswp, tgtfpn);
     enlist_pgn_node(&caller->mm->fifo_pgn,pgn, caller->mm->pgd[pgn]);
