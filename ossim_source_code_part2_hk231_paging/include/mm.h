@@ -25,7 +25,7 @@
 /* PTE BIT PRESENT */
 #define PAGING_PTE_SET_PRESENT(pte) (pte=pte|PAGING_PTE_PRESENT_MASK)
 #define PAGING_PAGE_PRESENT(pte) (pte&PAGING_PTE_PRESENT_MASK)
-#define PAGING_SWAP(pte) (pte&PAGING_PTE_SWAPPED_MASK)
+#define PAGING_SWAP(pte) ((pte&(1 << 30)) >> 30)
 /* USRNUM */
 #define PAGING_PTE_USRNUM_LOBIT 15
 #define PAGING_PTE_USRNUM_HIBIT 27
@@ -91,10 +91,27 @@
 #define INCLUDE(x1,x2,y1,y2) (((y1-x1)*(x2-y2)>=0)?1:0)
 #define OVERLAP(x1,x2,y1,y2) (((y2-x1)*(x2-y1)>=0)?1:0)
 
+struct memphy_struct {
+   /* Basic field of data and size */
+   BYTE *storage;
+   int maxsz;
+   
+   /* Sequential device fields */ 
+   int rdmflg;
+   int cursor;
+
+   /* Management structure */
+   struct framephy_struct *free_fp_list;
+   struct framephy_struct *used_fp_list;
+   pthread_mutex_t mp_lock;
+   // pthread_mutex_t storage_lock;
+   // pthread_mutex_t free_fp_lock;
+};
 /* VM region prototypes */
 struct vm_rg_struct * init_vm_rg(int rg_start, int rg_endi);
 int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode);
-int enlist_pgn_node(struct pgn_t **pgnlist, int pgn, uint32_t pte_addr);
+int enlist_pgn_node(struct pgn_t **pgnlist, int pgn, uint32_t* pte_addr);
+int enlist_entire_pgn_node(struct pgn_t **plist, struct pgn_t** newList);
 int vmap_page_range(struct pcb_t *caller, int addr, int pgnum, 
                     struct framephy_struct *frames, struct vm_rg_struct *ret_rg);
 int vm_map_ram(struct pcb_t *caller, int astart, int send, int mapstart, int incpgnum, struct vm_rg_struct *ret_rg);

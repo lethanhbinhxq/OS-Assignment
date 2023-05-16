@@ -10,13 +10,11 @@ typedef uint32_t addr_t;
 //typedef unsigned int uint32_t;
 // extern struct memphy_struct mram;
 // extern struct memphy_struct mswp[PAGING_MAX_MMSWP];
-
 struct pgn_t{
    int pgn;
-   uint32_t addr ;
+   uint32_t* addr;
    struct pgn_t *pg_next; 
 };
-
 /*
  *  Memory region struct
  */
@@ -71,21 +69,6 @@ struct framephy_struct {
    struct mm_struct* owner;
 };
 
-struct memphy_struct {
-   /* Basic field of data and size */
-   BYTE *storage;
-   int maxsz;
-   
-   /* Sequential device fields */ 
-   int rdmflg;
-   int cursor;
 
-   /* Management structure */
-   struct framephy_struct *free_fp_list;
-   struct framephy_struct *used_fp_list;
-
-   // pthread_mutex_t storage_lock;
-   // pthread_mutex_t free_fp_lock;
-};
 
 #endif

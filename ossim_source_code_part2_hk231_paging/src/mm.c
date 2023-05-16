@@ -115,7 +115,7 @@ int vmap_page_range(struct pcb_t *caller, // process call
     fpit = fpit->fp_next;
     /* Tracking for later page replacement activities (if needed)
     * Enqueue new usage page */
-    enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit, caller->mm->pgd[pgn + pgit]);
+    enlist_pgn_node(&caller->mm->fifo_pgn,pgn+pgit, &caller->mm->pgd[pgn + pgit]);
     ret_rg->rg_end = ret_rg->rg_end + PAGING_PAGESZ;
     free(temp);
     pgit++;
@@ -163,17 +163,17 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
       struct pgn_t *vicpgn = NULL;
        /* Find victim page */
       find_victim_page(caller->mm, &vicpgn);
-      printf("After in vicime\n");
-      print_list_pgn(caller->mm->fifo_pgn);
+      // printf("After in vicime: \n");
+      // print_list_pgn(caller->mm->fifo_pgn);
       /* Get free frame in MEMSWP */
       MEMPHY_get_freefp(caller->active_mswp, &swpfpn);
-      /* Copy frame to swap */
-      uint32_t vicpte = vicpgn->addr;
-      int vicfpn = PAGING_FPN(vicpte);
+      /* Copy frame to swap */  
+      uint32_t* vicpte = vicpgn->addr;
+      int vicfpn = PAGING_FPN(*vicpte);
       __swap_cp_page(caller->mram,vicfpn,caller->active_mswp, swpfpn);
-      int PAGING_SWAP_TYPE = GETVAL(vicpte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
+      // int PAGING_SWAP_TYPE = GETVAL(vicpte, PAGING_PTE_SWPTYP_MASK, PAGING_PTE_SWPTYP_LOBIT);
       /* Update page table */
-      pte_set_swap(&vicpte, PAGING_SWAP_TYPE, swpfpn * PAGE_SIZE);
+      pte_set_swap(vicpte, 0, swpfpn);
       // Now that address at vicfpn is freed, assign to frame list for later use
       struct framephy_struct *newNode = malloc(sizeof(struct framephy_struct));
       fpn = vicfpn;
@@ -181,6 +181,7 @@ int alloc_pages_range(struct pcb_t *caller, int req_pgnum, struct framephy_struc
       newNode->fp_next = *frm_lst;
       newNode->owner = caller->mm;
       *frm_lst = newNode;
+      enlist_entire_pgn_node(&caller->mm->fifo_pgn, &vicpgn);
     } 
   }
 
@@ -307,15 +308,15 @@ int enlist_vm_rg_node(struct vm_rg_struct **rglist, struct vm_rg_struct* rgnode)
 }
 // End change
 
-int enlist_pgn_node(struct pgn_t **plist, int pgn, uint32_t pte_addr)
+int enlist_pgn_node(struct pgn_t **plist, int pgn, uint32_t* pte_addr)
 {
-  if (*plist == NULL) {
-    /* list is empty, add to head */
-    *plist = malloc(sizeof(struct pgn_t));
-    (*plist)->pgn = pgn;
-    (*plist)->pg_next = NULL;
-    return 0;
-  }
+  // if (*plist == NULL) {
+  //   /* list is empty, add to head */
+  //   *plist = malloc(sizeof(struct pgn_t));
+  //   (*plist)->pgn = pgn;
+  //   (*plist)->pg_next = NULL;
+  //   return 0;
+  // }
   struct pgn_t* temp = *plist;
   struct pgn_t* pnode = malloc(sizeof(struct pgn_t));
 
@@ -339,6 +340,14 @@ int enlist_pgn_node(struct pgn_t **plist, int pgn, uint32_t pte_addr)
   return 0;
 }
 
+int enlist_entire_pgn_node(struct pgn_t **plist, struct pgn_t** newList) {
+    struct pgn_t* temp = *plist;
+    while(temp->pg_next != NULL) {
+      temp = temp->pg_next;
+    }
+    temp->pg_next = *newList;
+    return 0;
+}
 
 int print_list_fp(struct framephy_struct *ifp)
 {
@@ -395,7 +404,7 @@ int print_list_pgn(struct pgn_t *ip)
    printf("\n");
    while (ip != NULL )
    {
-       printf("va[%d]-\n",ip->pgn);
+       printf("va[%d, %8p]-\n",ip->pgn, ip->addr);
        ip = ip->pg_next;
    }
    printf("n");
