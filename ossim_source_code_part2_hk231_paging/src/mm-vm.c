@@ -395,7 +395,7 @@ int __write(struct pcb_t *caller, int vmaid, int rgid, int offset, BYTE value)
     return -1;
   }
   pg_setval(caller->mm, currg->rg_start + offset, value, caller);
-
+  MEMPHY_dump(caller->mram);
   return 0;
 }
 
@@ -411,7 +411,6 @@ int pgwrite(
 #ifdef PAGETBL_DUMP
   print_pgtbl(proc, 0, -1); //print max TBL
 #endif
-  MEMPHY_dump(proc->mram);
 #endif
   if (proc->mm->symrgtbl[destination].rg_start == proc->mm->symrgtbl[destination].rg_end) {
     pgalloc(proc, 100, destination);

@@ -174,20 +174,21 @@ int MEMPHY_dump(struct memphy_struct * mp)
     /*TODO dump memphy contnt mp->storage 
      *     for tracing the memory content
      */
-   //  printf("Start memphy dump\n");
-   // pthread_mutex_lock(&mp->mp_lock);
-   // struct framephy_struct *fp = mp->free_fp_list;
-   // while(fp != NULL) {
-   //    printf("Free frame: %2d", fp->fpn);
-   //    fp = fp->fp_next;
-   // }
-
+    printf("Start memphy dump\n");
+   pthread_mutex_lock(&mp->mp_lock);
+   for (int i = 0;i<mp->maxsz;i++) {
+      BYTE value = mp->storage[i];
+      uint32_t dest = (uint32_t) value;
+      if (dest != 0) {
+         printf("Address=%2d, Value=%d\n", i, dest);
+      }
+   }
    
 
    // /* MEMPHY is iteratively used up until its exhausted
    //  * No garbage collector acting then it not been released
    //  */
-   // pthread_mutex_unlock(&mp->mp_lock);
+   pthread_mutex_unlock(&mp->mp_lock);
    return 0;
 }
 
