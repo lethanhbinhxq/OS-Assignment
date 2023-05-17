@@ -178,8 +178,8 @@ int MEMPHY_dump(struct memphy_struct * mp)
    pthread_mutex_lock(&mp->mp_lock);
    for (int i = 0;i<mp->maxsz;i++) {
       BYTE value = mp->storage[i];
-      uint32_t dest = (uint32_t) value;
-      if (dest != 0) {
+      int dest = (int) value;
+      if (dest >= 0) {
          printf("Address=%2d, Value=%d\n", i, dest);
       }
    }
@@ -213,6 +213,9 @@ int MEMPHY_put_freefp(struct memphy_struct *mp, int fpn)
 int init_memphy(struct memphy_struct *mp, int max_size, int randomflg)
 {
    mp->storage = (BYTE *)malloc(max_size*sizeof(BYTE));
+   for(int i = 0;i<max_size;i++) {
+      mp->storage[i] = -1;
+   }
    mp->maxsz = max_size;
    pthread_mutex_init(&mp->mp_lock, NULL);
    MEMPHY_format(mp,PAGING_PAGESZ);

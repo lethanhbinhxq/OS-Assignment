@@ -297,7 +297,7 @@ int pg_getval(struct mm_struct *mm, int addr, BYTE *data, struct pcb_t *caller)
     return -1; /* invalid page access */
 
   int phyaddr = (fpn << PAGING_ADDR_FPN_LOBIT) + off;
-  // printf("Fpn=%2d Pgn=%2d Off=%2d Phyaddr %2d\n", fpn, pgn, off, phyaddr);
+  printf("Read address %2d\n", phyaddr);
 
   MEMPHY_read(caller->mram,phyaddr, data);
 
@@ -321,7 +321,7 @@ int pg_setval(struct mm_struct *mm, int addr, BYTE value, struct pcb_t *caller)
     return -1; /* invalid page access */
 
   int phyaddr = (fpn << PAGING_ADDR_FPN_LOBIT) + off;
-  // printf("Fpn=%2d Pgn=%2d Off=%2d Phyaddr %2d\n", fpn, pgn, off, phyaddr);
+  printf("Write address %2d\n", phyaddr);
 
   MEMPHY_write(caller->mram,phyaddr, value);
 
